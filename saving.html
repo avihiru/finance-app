@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;">
+  <title>Saving Tracker</title>
+  <style>
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    :root {
+      --bg:#f3f4f8; --surface:#ffffff; --surface2:#f0f1f5;
+      --border:#e2e5ec; --text:#1a1d27; --muted:#7a7f93;
+      --green:#10b981; --red:#ef4444; --purple:#6366f1;
+      --radius:14px; --radius-sm:8px; --shadow:0 2px 12px rgba(0,0,0,0.07);
+    }
+    [data-theme="dark"] {
+      --bg:#111318; --surface:#1c1f27; --surface2:#242831;
+      --border:rgba(255,255,255,0.08); --text:#e8eaf0; --muted:#8a8f9e;
+      --shadow:0 2px 12px rgba(0,0,0,0.3);
+    }
+    body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:2rem;transition:background .25s,color .25s;}
+    .topbar{position:sticky;top:0;z-index:100;background:var(--surface);border-bottom:1px solid var(--border);padding:.8rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:.75rem;box-shadow:var(--shadow);}
+    .topbar h1{font-size:1rem;font-weight:700;color:var(--purple);white-space:nowrap;}
+    .topbar-right{display:flex;align-items:center;gap:.6rem;flex-shrink:0;}
+    .btn-nav{display:inline-flex;align-items:center;gap:.3rem;padding:.4rem .8rem;border-radius:8px;border:none;font-size:.8rem;font-weight:600;cursor:pointer;text-decoration:none;transition:opacity .2s;}
+    .btn-back{background:rgba(99,102,241,.15);color:var(--purple);}
+    .btn-export{background:rgba(16,185,129,.12);color:var(--green);border:1px solid rgba(16,185,129,.25);}
+    .btn-nav:hover{opacity:.85;}
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem;opacity:0;pointer-events:none;transition:opacity .25s;}
+    .modal-overlay.open{opacity:1;pointer-events:all;}
+    .modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem 1.25rem;width:100%;max-width:320px;transform:translateY(16px);transition:transform .25s;}
+    .modal-overlay.open .modal{transform:translateY(0);}
+    .modal h3{font-size:1rem;font-weight:700;margin-bottom:.3rem;color:var(--green);}
+    .modal p{font-size:.8rem;color:var(--muted);margin-bottom:1.1rem;line-height:1.5;}
+    .modal-btns{display:flex;flex-direction:column;gap:.6rem;}
+    .modal-btn{width:100%;padding:.75rem;border:none;border-radius:var(--radius-sm);font-size:.88rem;font-weight:700;cursor:pointer;transition:opacity .2s;}
+    .modal-btn:hover{opacity:.85;}
+    .modal-btn-sv{background:var(--green);color:#0a2e22;}
+    .modal-btn-tx{background:var(--purple);color:#fff;}
+    .modal-btn-cancel{background:var(--surface2);color:var(--muted);}
+    .theme-toggle{display:flex;align-items:center;gap:.4rem;}
+    .theme-label{font-size:.75rem;color:var(--muted);}
+    .switch{position:relative;width:46px;height:24px;flex-shrink:0;}
+    .switch input{opacity:0;width:0;height:0;}
+    .slider-track{position:absolute;inset:0;background:var(--border);border-radius:12px;cursor:pointer;transition:background .3s;}
+    .switch input:checked ~ .slider-track{background:var(--purple);}
+    .slider-thumb{position:absolute;top:3px;left:3px;width:18px;height:18px;background:var(--surface);border-radius:50%;transition:transform .3s;pointer-events:none;display:flex;align-items:center;justify-content:center;font-size:10px;}
+    .switch input:checked ~ .slider-thumb{transform:translateX(22px);}
+    .content{max-width:900px;margin:0 auto;padding:1rem;}
+    .summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;margin-bottom:1.25rem;}
+    @media(max-width:420px){.summary-grid{grid-template-columns:1fr;}}
+    .summary-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem .9rem;text-align:center;box-shadow:var(--shadow);}
+    .summary-card .label{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.4rem;}
+    .summary-card .value{font-size:clamp(.95rem,3.5vw,1.45rem);font-weight:700;word-break:break-all;}
+    .value.green{color:var(--green);} .value.red{color:var(--red);} .value.purple{color:var(--purple);}
+    .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.2rem 1rem;margin-bottom:1.25rem;box-shadow:var(--shadow);}
+    .section-title{font-size:.9rem;font-weight:700;color:var(--text);margin-bottom:1rem;padding-bottom:.6rem;border-bottom:1px solid var(--border);}
+    .chart-legend{display:flex;gap:1rem;margin-bottom:.75rem;flex-wrap:wrap;}
+    .legend-item{display:flex;align-items:center;gap:.35rem;font-size:.75rem;color:var(--muted);}
+    .legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+    .dot-save{background:var(--green);} .dot-expense{background:var(--red);}
+    .chart-scroll{overflow-x:auto;padding-bottom:.5rem;}
+    .chart-wrap{display:flex;align-items:flex-end;gap:4px;min-width:280px;height:180px;padding-top:2rem;}
+    .bar-group{display:flex;flex-direction:column;align-items:center;flex:1;min-width:28px;}
+    .bar-label{font-size:.65rem;color:var(--muted);margin-top:4px;white-space:nowrap;}
+    .bars{display:flex;align-items:flex-end;gap:2px;width:100%;justify-content:center;}
+    .bar{width:12px;border-radius:3px 3px 0 0;min-height:3px;}
+    .bar.save{background:var(--green);} .bar.expense{background:var(--red);}
+    .form-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.2rem 1rem;margin-bottom:1.25rem;box-shadow:var(--shadow);}
+    .form-row{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem;}
+    @media(max-width:480px){.form-row{grid-template-columns:1fr;}}
+    .form-group{display:flex;flex-direction:column;gap:.3rem;}
+    .form-group label{font-size:.78rem;color:var(--muted);font-weight:500;}
+    .form-group input{padding:.65rem .85rem;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:.95rem;width:100%;}
+    .form-group input:focus{outline:none;border-color:var(--purple);}
+    .btn-add{width:100%;padding:.8rem;border:none;border-radius:var(--radius-sm);background:var(--purple);color:white;font-size:.95rem;font-weight:700;cursor:pointer;transition:opacity .2s,transform .15s;}
+    .btn-add:hover{opacity:.88;transform:translateY(-1px);}
+    .btn-add:active{transform:scale(.98);}
+    .filter-tabs{display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;}
+    .ftab{padding:.4rem .9rem;border-radius:20px;border:1px solid var(--border);background:none;color:var(--muted);font-size:.8rem;font-weight:600;cursor:pointer;transition:all .2s;}
+    .ftab.active{background:var(--purple);color:white;border-color:var(--purple);}
+    .tx-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.2rem 1rem;box-shadow:var(--shadow);}
+    .tx-list{list-style:none;}
+    .tx-item{display:flex;align-items:center;gap:.75rem;padding:.85rem 0;border-bottom:1px solid var(--border);}
+    .tx-item:last-child{border-bottom:none;}
+    .tx-icon{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.9rem;font-weight:700;flex-shrink:0;}
+    .tx-icon.saving{background:rgba(16,185,129,.12);color:var(--green);}
+    .tx-icon.expense{background:rgba(239,68,68,.12);color:var(--red);}
+    .tx-info{flex:1;min-width:0;}
+    .tx-name{font-size:.9rem;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .tx-date{font-size:.72rem;color:var(--muted);margin-top:.15rem;}
+    .tx-amount{font-size:.92rem;font-weight:700;white-space:nowrap;flex-shrink:0;}
+    .tx-amount.saving{color:var(--green);} .tx-amount.expense{color:var(--red);}
+    .tx-delete{background:none;border:none;color:var(--muted);cursor:pointer;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0;transition:background .2s,color .2s;}
+    .tx-delete:hover{background:rgba(239,68,68,.12);color:var(--red);}
+    .tx-empty{text-align:center;color:var(--muted);padding:2rem 0;font-size:.9rem;font-style:italic;}
+    .spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--purple);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;}
+    @keyframes spin{to{transform:rotate(360deg);}}
+    .loading-row{text-align:center;padding:2rem 0;color:var(--muted);}
+    .toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%) translateY(80px);background:var(--surface);color:var(--text);padding:.7rem 1.4rem;border-radius:50px;font-size:.88rem;font-weight:600;border:1px solid var(--border);box-shadow:var(--shadow);z-index:999;opacity:0;transition:transform .3s,opacity .3s;white-space:nowrap;}
+    .toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
+    .toast.success{border-color:var(--green);color:var(--green);}
+    .toast.error{border-color:var(--red);color:var(--red);}
+    footer{text-align:center;padding:1.5rem 1rem .5rem;font-size:.78rem;color:var(--muted);border-top:1px solid var(--border);margin-top:1.5rem;}
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <h1>🏦 Saving Tracker</h1>
+  <div class="topbar-right">
+    <a href="index.html" class="btn-nav btn-back">← Back</a>
+    <button class="btn-nav btn-export" onclick="openExportModal()">⬇ SQL</button>
+    <div class="theme-toggle">
+      <span class="theme-label" id="themeLabel">Dark</span>
+      <label class="switch">
+        <input type="checkbox" id="themeToggle" checked />
+        <div class="slider-track"></div>
+        <div class="slider-thumb" id="themeIcon">🌙</div>
+      </label>
+    </div>
+  </div>
+</header>
+
+<div class="modal-overlay" id="exportModal" onclick="closeExportModal(event)">
+  <div class="modal">
+    <h3>⬇ Export SQL</h3>
+    <p>Downloads a <code>.sql</code> file compatible with phpMyAdmin / MySQL.</p>
+    <div class="modal-btns">
+      <button class="modal-btn modal-btn-sv" onclick="exportSQL('saving')">Saving Table</button>
+      <button class="modal-btn modal-btn-tx" onclick="exportSQL('transactions')">All Transactions</button>
+      <button class="modal-btn modal-btn-cancel" onclick="closeExportModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<main class="content">
+  <div class="summary-grid">
+    <div class="summary-card"><div class="label">Total Savings</div><div class="value green" id="totalSavings">—</div></div>
+    <div class="summary-card"><div class="label">Total Expenses</div><div class="value red" id="totalExpenses">—</div></div>
+    <div class="summary-card"><div class="label">Net Balance</div><div class="value purple" id="netBalance">—</div></div>
+  </div>
+
+  <div class="chart-card">
+    <div class="section-title">Monthly Overview</div>
+    <div class="chart-legend">
+      <div class="legend-item"><div class="legend-dot dot-save"></div> Savings</div>
+      <div class="legend-item"><div class="legend-dot dot-expense"></div> Expenses</div>
+    </div>
+    <div class="chart-scroll">
+      <div class="chart-wrap" id="chart">
+        <div class="loading-row"><span class="spinner"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-card">
+    <div class="section-title">Add New Saving</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="desc">Description</label>
+        <input type="text" id="desc" placeholder="e.g. Monthly saving" />
+      </div>
+      <div class="form-group">
+        <label for="amt">Amount (Rs.)</label>
+        <input type="number" id="amt" step="0.01" min="0.01" placeholder="0.00" />
+      </div>
+    </div>
+    <button class="btn-add" id="addBtn" onclick="submitAdd()">Add Saving</button>
+  </div>
+
+  <div class="tx-card">
+    <div class="section-title">Recent Transactions</div>
+    <div class="filter-tabs">
+      <button class="ftab active" data-filter="all">All</button>
+      <button class="ftab" data-filter="saving">Savings</button>
+      <button class="ftab" data-filter="expense">Expenses</button>
+    </div>
+    <ul class="tx-list" id="txList">
+      <li class="loading-row"><span class="spinner"></span> Loading…</li>
+    </ul>
+  </div>
+</main>
+
+<footer>© All rights reserved. A product by <strong>Avishka Batapola</strong>.</footer>
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+//  IndexedDB layer  (self-contained, no external file)
+// ══════════════════════════════════════════════════════════════════
+var DB_NAME    = 'FinanceTrackerDB';
+var DB_VERSION = 1;
+
+var SEED_TX = [
+  {id:233,type:'income', category:'salary',        amount:86800.00, description:'March salary',           date:'2026-04-13T16:41:51', month:'April'},
+  {id:234,type:'expense',category:'groceries',     amount:993.00,   description:'Groceries',              date:'2026-04-14T00:36:40', month:'April'},
+  {id:235,type:'expense',category:'groceries',     amount:608.67,   description:'cat food',               date:'2026-04-14T01:26:54', month:'April'},
+  {id:236,type:'expense',category:'other',         amount:1515.00,  description:'other',                  date:'2026-04-14T01:28:03', month:'April'},
+  {id:237,type:'expense',category:'communication', amount:150.00,   description:'reload',                 date:'2026-04-14T01:28:24', month:'April'},
+  {id:238,type:'expense',category:'other',         amount:5005.00,  description:'other',                  date:'2026-04-14T01:30:24', month:'April'},
+  {id:239,type:'expense',category:'other',         amount:4060.00,  description:'other',                  date:'2026-04-14T01:30:45', month:'April'},
+  {id:240,type:'expense',category:'other',         amount:35005.00, description:'for buy refrigerator',   date:'2026-04-14T01:32:50', month:'April'},
+  {id:241,type:'expense',category:'communication', amount:100.00,   description:'reload',                 date:'2026-04-14T01:44:51', month:'April'},
+  {id:242,type:'expense',category:'communication', amount:3186.04,  description:'slt bill',               date:'2026-04-14T01:45:14', month:'April'},
+  {id:243,type:'expense',category:'communication', amount:50.00,    description:'reload',                 date:'2026-04-14T01:45:37', month:'April'},
+  {id:244,type:'expense',category:'groceries',     amount:2472.00,  description:'food',                   date:'2026-04-14T01:46:24', month:'April'},
+  {id:245,type:'expense',category:'groceries',     amount:660.00,   description:'food and accesories',    date:'2026-04-14T01:46:47', month:'April'},
+  {id:246,type:'expense',category:'communication', amount:100.00,   description:'reload',                 date:'2026-04-14T01:47:00', month:'April'},
+  {id:247,type:'expense',category:'communication', amount:699.00,   description:'dialog router',          date:'2026-04-14T01:48:11', month:'April'},
+  {id:248,type:'expense',category:'other',         amount:9005.00,  description:'other',                  date:'2026-04-14T01:48:34', month:'April'},
+  {id:249,type:'expense',category:'other',         amount:5030.00,  description:'other',                  date:'2026-04-14T01:49:08', month:'April'},
+  {id:250,type:'expense',category:'communication', amount:200.00,   description:'reload',                 date:'2026-04-14T01:50:03', month:'April'},
+  {id:251,type:'expense',category:'other',         amount:17005.00, description:'new year',               date:'2026-04-14T01:51:34', month:'April'},
+  {id:259,type:'expense',category:'communication', amount:100.00,   description:'Reload',                 date:'2026-04-17T01:56:58', month:'April'},
+  {id:260,type:'expense',category:'other',         amount:125.00,   description:'Qua charge',             date:'2026-04-17T03:07:45', month:'April'},
+  {id:261,type:'income', category:'other',         amount:1492.27,  description:'Balance',                date:'2026-04-17T05:59:43', month:'April'},
+  {id:262,type:'expense',category:'communication', amount:50.00,    description:'Reload',                 date:'2026-04-18T13:45:43', month:'April'},
+  {id:263,type:'expense',category:'communication', amount:307.00,   description:'Reload for office',      date:'2026-04-20T13:08:51', month:'April'},
+  {id:264,type:'expense',category:'communication', amount:50.00,    description:'Reload',                 date:'2026-04-21T11:19:16', month:'April'},
+  {id:265,type:'income', category:'other',         amount:41.98,    description:'Interest',               date:'2026-04-22T10:53:00', month:'April'},
+  {id:267,type:'expense',category:'communication', amount:150.00,   description:'Reload',                 date:'2026-04-22T10:55:19', month:'April'},
+  {id:268,type:'expense',category:'other',         amount:735.94,   description:'Other',                  date:'2026-04-25T14:13:10', month:'April'},
+  {id:269,type:'income', category:'investment',    amount:972.60,   description:'Previous balance',       date:'2026-04-25T14:16:10', month:'May'},
+  {id:270,type:'income', category:'salary',        amount:86800.00, description:'Salary',                 date:'2026-04-25T14:16:40', month:'May'},
+  {id:271,type:'expense',category:'other',         amount:15000.00, description:'Fridge loan',            date:'2026-04-25T14:19:42', month:'May'},
+  {id:273,type:'expense',category:'transport',     amount:5005.00,  description:'Bus fee',                date:'2026-04-25T14:21:30', month:'May'},
+  {id:274,type:'expense',category:'groceries',     amount:627.50,   description:'Foods',                  date:'2026-04-25T14:22:33', month:'May'},
+  {id:275,type:'income', category:'other',         amount:3000.00,  description:'Party balance donation', date:'2026-04-25T15:58:21', month:'May'},
+  {id:276,type:'expense',category:'other',         amount:608.67,   description:'Koko payment',           date:'2026-04-25T16:03:45', month:'May'},
+  {id:277,type:'income', category:'other',         amount:1000.00,  description:'Party balance',          date:'2026-04-26T01:38:02', month:'May'},
+  {id:278,type:'expense',category:'communication', amount:699.00,   description:'Reload',                 date:'2026-04-26T02:41:05', month:'May'},
+  {id:279,type:'expense',category:'communication', amount:50.00,    description:'Reload',                 date:'2026-04-28T00:26:13', month:'May'},
+  {id:280,type:'income', category:'other',         amount:1000.00,  description:'Party balance',          date:'2026-04-28T12:15:35', month:'May'},
+  {id:281,type:'income', category:'other',         amount:1000.00,  description:'Party balance',          date:'2026-04-28T12:34:54', month:'May'},
+  {id:282,type:'expense',category:'other',         amount:5030.00,  description:'Party balance due',      date:'2026-04-28T13:17:19', month:'May'},
+  {id:283,type:'expense',category:'communication', amount:4030.00,  description:'Wedding',                date:'2026-04-29T02:56:30', month:'May'},
+  {id:284,type:'expense',category:'Saving',        amount:10000.00, description:'May saving',             date:'2026-04-29T03:48:34', month:'May'},
+  {id:285,type:'expense',category:'other',         amount:50.00,    description:'Balance',                date:'2026-04-29T08:04:56', month:'May'},
+  {id:286,type:'expense',category:'groceries',     amount:2330.00,  description:'Foods',                  date:'2026-04-29T08:05:45', month:'May'},
+  {id:287,type:'expense',category:'other',         amount:3060.00,  description:'Wedding',                date:'2026-04-30T03:36:13', month:'May'},
+  {id:288,type:'expense',category:'communication', amount:3186.04,  description:'Slt bill',               date:'2026-05-02T03:29:59', month:'May'},
+  {id:289,type:'expense',category:'communication', amount:10000.00, description:'Classfees',              date:'2026-05-02T05:54:33', month:'May'},
+  {id:290,type:'expense',category:'other',         amount:2005.00,  description:'Other payments',         date:'2026-05-02T05:55:16', month:'May'},
+  {id:291,type:'expense',category:'communication', amount:200.00,   description:'Reload',                 date:'2026-05-06T06:25:49', month:'May'},
+  {id:293,type:'expense',category:'communication', amount:1061.00,  description:'Reload',                 date:'2026-05-06T06:33:07', month:'May'},
+  {id:294,type:'expense',category:'other',         amount:1030.00,  description:'Birthdays',              date:'2026-05-13T09:18:09', month:'May'},
+  {id:295,type:'expense',category:'communication', amount:150.00,   description:'Reload',                 date:'2026-05-13T09:19:04', month:'May'},
+  {id:296,type:'expense',category:'other',         amount:3005.00,  description:'Others',                 date:'2026-05-13T09:19:39', month:'May'},
+  {id:297,type:'expense',category:'communication', amount:50.00,    description:'Reload',                 date:'2026-05-13T12:27:47', month:'May'}
+];
+
+var SEED_SV = [
+  {id:73, description:'past saving',             amount:100000.00, state:'saving',  month:'April', date:'2026-04-14', time:'01:39:26'},
+  {id:74, description:'for buy refrigerator',    amount:40005.00,  state:'expense', month:'April', date:'2026-04-14', time:'01:41:49'},
+  {id:78, description:'New year party',          amount:5005.00,   state:'expense', month:'April', date:'2026-04-15', time:'03:49:39'},
+  {id:80, description:'For medicine and others', amount:2661.10,   state:'expense', month:'April', date:'2026-04-17', time:'02:04:05'},
+  {id:81, description:'Interest',                amount:116.20,    state:'saving',  month:'April', date:'2026-04-22', time:'06:54:13'},
+  {id:82, description:'Emergency',               amount:3405.00,   state:'expense', month:'April', date:'2026-04-25', time:'10:11:15'},
+  {id:83, description:'May saving',              amount:10000.00,  state:'saving',  month:'April', date:'2026-04-28', time:'23:48:34'}
+];
+
+var MONTH_NAMES = ['January','February','March','April','May','June',
+                   'July','August','September','October','November','December'];
+
+function currentMonthName() { return MONTH_NAMES[new Date().getMonth()]; }
+
+var _db = null;
+
+function openDB() {
+  if (_db) return Promise.resolve(_db);
+  return new Promise(function(resolve, reject) {
+    var req = indexedDB.open(DB_NAME, DB_VERSION);
+
+    req.onupgradeneeded = function(e) {
+      var db = e.target.result;
+      if (!db.objectStoreNames.contains('transactions')) {
+        db.createObjectStore('transactions', { keyPath: 'id', autoIncrement: true });
+      }
+      if (!db.objectStoreNames.contains('saving')) {
+        db.createObjectStore('saving', { keyPath: 'id', autoIncrement: true });
+      }
+      if (!db.objectStoreNames.contains('meta')) {
+        db.createObjectStore('meta', { keyPath: 'key' });
+      }
+    };
+
+    req.onsuccess = function(e) {
+      _db = e.target.result;
+      seedIfNeeded().then(function() { resolve(_db); }).catch(reject);
+    };
+
+    req.onerror   = function() { reject(req.error); };
+    req.onblocked = function() { reject(new Error('IDB blocked')); };
+  });
+}
+
+function seedIfNeeded() {
+  return new Promise(function(resolve, reject) {
+    var checkTx  = _db.transaction('meta', 'readonly');
+    var checkReq = checkTx.objectStore('meta').get('seeded');
+
+    checkReq.onsuccess = function() {
+      if (checkReq.result) { resolve(); return; }
+
+      var tx = _db.transaction(['meta', 'transactions', 'saving'], 'readwrite');
+      tx.oncomplete = function() { resolve(); };
+      tx.onerror    = function() { reject(tx.error); };
+      tx.onabort    = function() { reject(new Error('Seed aborted')); };
+
+      var txStore = tx.objectStore('transactions');
+      var svStore = tx.objectStore('saving');
+      SEED_TX.forEach(function(r) { txStore.put(r); });
+      SEED_SV.forEach(function(r) { svStore.put(r); });
+      tx.objectStore('meta').put({ key: 'seeded', value: true });
+    };
+
+    checkReq.onerror = function() { reject(checkReq.error); };
+  });
+}
+
+function dbGetAll(storeName) {
+  return openDB().then(function(db) {
+    return new Promise(function(resolve, reject) {
+      var tx  = db.transaction(storeName, 'readonly');
+      var req = tx.objectStore(storeName).getAll();
+      req.onsuccess = function() { resolve(req.result); };
+      req.onerror   = function() { reject(req.error); };
+    });
+  });
+}
+
+function dbAdd(storeName, record) {
+  return openDB().then(function(db) {
+    return new Promise(function(resolve, reject) {
+      // Strip id so autoIncrement generates a fresh key (never collides with seed)
+      var r = {};
+      Object.keys(record).forEach(function(k) { if (k !== 'id') r[k] = record[k]; });
+      var tx  = db.transaction(storeName, 'readwrite');
+      var req = tx.objectStore(storeName).add(r);
+      var newId;
+      req.onsuccess = function() { newId = req.result; };
+      tx.oncomplete = function() { resolve(newId); };
+      tx.onerror    = function() { reject(tx.error); };
+      req.onerror   = function() { reject(req.error); };
+    });
+  });
+}
+
+function dbDelete(storeName, id) {
+  return openDB().then(function(db) {
+    return new Promise(function(resolve, reject) {
+      var tx = db.transaction(storeName, 'readwrite');
+      tx.objectStore(storeName).delete(id);
+      tx.oncomplete = function() { resolve(); };
+      tx.onerror    = function() { reject(tx.error); };
+    });
+  });
+}
+
+var Savings = {
+  getAll: function() {
+    return dbGetAll('saving').then(function(all) {
+      all.sort(function(a,b) {
+        return new Date(b.date + 'T' + (b.time||'00:00:00'))
+             - new Date(a.date + 'T' + (a.time||'00:00:00'));
+      });
+      var ts = 0, te = 0;
+      all.forEach(function(r) {
+        if (r.state === 'saving') ts += parseFloat(r.amount);
+        else                       te += parseFloat(r.amount);
+      });
+      var monthly = {};
+      all.forEach(function(r) {
+        if (!monthly[r.month]) monthly[r.month] = { saving:0, expense:0 };
+        if (r.state === 'saving') monthly[r.month].saving  += parseFloat(r.amount);
+        else                       monthly[r.month].expense += parseFloat(r.amount);
+      });
+      return { total_savings:ts, total_expenses:te, net_balance:ts-te,
+               monthly:monthly, transactions:all };
+    });
+  },
+
+  add: function(opts) {
+    var now = new Date();
+    return dbAdd('saving', {
+      description: opts.description,
+      amount:      parseFloat(opts.amount),
+      state:       'saving',
+      month:       currentMonthName(),
+      date:        now.toISOString().slice(0,10),
+      time:        now.toTimeString().slice(0,8)
+    });
+  },
+
+  delete: function(id) { return dbDelete('saving', Number(id)); }
+};
+
+// ══════════════════════════════════════════════════════════════════
+//  App logic
+// ══════════════════════════════════════════════════════════════════
+if (sessionStorage.getItem('ft_auth') !== 'true') {
+  location.replace('login.html');
+}
+
+var allTransactions = [];
+var activeFilter    = 'all';
+
+function fmt(n) {
+  return 'Rs.' + parseFloat(n || 0).toLocaleString('en-US', {
+    minimumFractionDigits:2, maximumFractionDigits:2
+  });
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                  .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showToast(msg, type) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + (type||'success') + ' show';
+  setTimeout(function() { t.className = 'toast'; }, 3000);
+}
+
+// ── Theme ─────────────────────────────────────────────────────────
+var toggle    = document.getElementById('themeToggle');
+var themeIcon = document.getElementById('themeIcon');
+var themeLbl  = document.getElementById('themeLabel');
+
+var savedTheme = 'dark';
+try { savedTheme = localStorage.getItem('sv-theme') || 'dark'; } catch(e) {}
+
+function applyTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  toggle.checked    = (t === 'dark');
+  themeIcon.textContent = (t === 'dark') ? '🌙' : '☀️';
+  themeLbl.textContent  = (t === 'dark') ? 'Dark' : 'Light';
+  try { localStorage.setItem('sv-theme', t); } catch(e) {}
+}
+
+applyTheme(savedTheme);
+toggle.addEventListener('change', function() {
+  applyTheme(toggle.checked ? 'dark' : 'light');
+});
+
+// ── Load ──────────────────────────────────────────────────────────
+function loadData() {
+  Savings.getAll().then(function(data) {
+    document.getElementById('totalSavings').textContent  = fmt(data.total_savings);
+    document.getElementById('totalExpenses').textContent = fmt(data.total_expenses);
+    document.getElementById('netBalance').textContent    = fmt(data.net_balance);
+    renderChart(data.monthly || {});
+    allTransactions = data.transactions || [];
+    renderList();
+  }).catch(function(err) {
+    document.getElementById('txList').innerHTML =
+      '<li class="tx-empty">Error: ' + escHtml(err.message) + '</li>';
+  });
+}
+
+// ── Chart ─────────────────────────────────────────────────────────
+function renderChart(monthly) {
+  var chart   = document.getElementById('chart');
+  var entries = Object.keys(monthly).map(function(k) { return [k, monthly[k]]; });
+
+  if (!entries.length) {
+    chart.innerHTML = '<div class="loading-row" style="font-size:.8rem">No data yet.</div>';
+    return;
+  }
+
+  var maxVal = 0;
+  entries.forEach(function(e) {
+    maxVal = Math.max(maxVal, e[1].saving || 0, e[1].expense || 0);
+  });
+  var maxH = 140;
+
+  chart.innerHTML = entries.map(function(e) {
+    var month = e[0], d = e[1];
+    var sh = maxVal > 0 ? Math.max(3, Math.round(((d.saving  || 0) / maxVal) * maxH)) : 3;
+    var eh = maxVal > 0 ? Math.max(3, Math.round(((d.expense || 0) / maxVal) * maxH)) : 3;
+    return '<div class="bar-group">' +
+      '<div class="bars">' +
+        '<div class="bar save"    style="height:' + sh + 'px" title="Saving: '  + fmt(d.saving)  + '"></div>' +
+        '<div class="bar expense" style="height:' + eh + 'px" title="Expense: ' + fmt(d.expense) + '"></div>' +
+      '</div>' +
+      '<div class="bar-label">' + escHtml(month.slice(0,3)) + '</div>' +
+    '</div>';
+  }).join('');
+}
+
+// ── List ──────────────────────────────────────────────────────────
+function renderList() {
+  var list = document.getElementById('txList');
+  var filtered = activeFilter === 'all'
+    ? allTransactions
+    : allTransactions.filter(function(t) { return t.state === activeFilter; });
+
+  if (!filtered.length) {
+    list.innerHTML = '<li class="tx-empty">No records found.</li>';
+    return;
+  }
+
+  list.innerHTML = filtered.map(function(t) {
+    var isSaving = t.state === 'saving';
+    return '<li class="tx-item">' +
+      '<div class="tx-icon ' + t.state + '">' + (isSaving ? '↑' : '↓') + '</div>' +
+      '<div class="tx-info">' +
+        '<div class="tx-name">' + escHtml(t.description) + '</div>' +
+        '<div class="tx-date">' + escHtml(t.date) + '</div>' +
+      '</div>' +
+      '<div class="tx-amount ' + t.state + '">' + (isSaving ? '+' : '−') + fmt(t.amount) + '</div>' +
+      '<button class="tx-delete" onclick="deleteTx(' + Number(t.id) + ')" title="Delete">✕</button>' +
+    '</li>';
+  }).join('');
+}
+
+// ── Filter tabs ───────────────────────────────────────────────────
+document.querySelectorAll('.ftab').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.ftab').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    activeFilter = btn.getAttribute('data-filter');
+    renderList();
+  });
+});
+
+// ── Add ───────────────────────────────────────────────────────────
+function submitAdd() {
+  var desc   = document.getElementById('desc').value.trim();
+  var amount = document.getElementById('amt').value;
+
+  if (!desc)                              { showToast('Please enter a description.', 'error'); return; }
+  if (!amount || parseFloat(amount) <= 0) { showToast('Enter a valid amount.', 'error'); return; }
+
+  var btn  = document.getElementById('addBtn');
+  var orig = btn.textContent;
+  btn.disabled  = true;
+  btn.innerHTML = '<span class="spinner"></span> Saving…';
+
+  Savings.add({ description: desc, amount: amount })
+    .then(function() {
+      showToast('Saving added!', 'success');
+      document.getElementById('desc').value = '';
+      document.getElementById('amt').value  = '';
+      loadData();
+    })
+    .catch(function(err) { showToast('Error: ' + err.message, 'error'); })
+    .finally(function() { btn.disabled = false; btn.textContent = orig; });
+}
+
+// ── Delete ────────────────────────────────────────────────────────
+function deleteTx(id) {
+  if (!confirm('Delete this record?')) return;
+  Savings.delete(id)
+    .then(function() { showToast('Deleted.', 'success'); loadData(); })
+    .catch(function(err) { showToast('Delete failed: ' + err.message, 'error'); });
+}
+
+// ── Export SQL ────────────────────────────────────────────────────
+function openExportModal()  { document.getElementById('exportModal').classList.add('open'); }
+function closeExportModal(e) {
+  if (!e || e.target === document.getElementById('exportModal')) {
+    document.getElementById('exportModal').classList.remove('open');
+  }
+}
+
+function sqlEscape(val) {
+  if (val === null || val === undefined) return 'NULL';
+  return "'" + String(val).replace(/\\/g,'\\\\').replace(/'/g,"\\'") + "'";
+}
+
+function buildSavingSQL(rows) {
+  var now = new Date().toISOString().replace('T',' ').slice(0,19);
+  var sql = '-- Finance Tracker SQL Export (Saving Table)\n-- Generated: ' + now + '\n\n';
+  sql += 'SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";\nSET AUTOCOMMIT = 0;\nSTART TRANSACTION;\n\n';
+  sql += 'CREATE TABLE IF NOT EXISTS `saving` (\n';
+  sql += '  `id` int(11) NOT NULL AUTO_INCREMENT,\n';
+  sql += '  `description` varchar(255) DEFAULT NULL,\n';
+  sql += '  `amount` decimal(10,2) DEFAULT NULL,\n';
+  sql += '  `state` varchar(50) DEFAULT NULL,\n';
+  sql += '  `month` varchar(20) DEFAULT NULL,\n';
+  sql += '  `date` date DEFAULT NULL,\n';
+  sql += '  `time` time DEFAULT NULL,\n';
+  sql += '  PRIMARY KEY (`id`)\n) ENGINE=MyISAM DEFAULT CHARSET=latin1;\n\n';
+  if (rows.length > 0) {
+    sql += 'INSERT INTO `saving` (`id`, `description`, `amount`, `state`, `month`, `date`, `time`) VALUES\n';
+    sql += rows.map(function(r) {
+      return '(' + [Number(r.id), sqlEscape(r.description), parseFloat(r.amount).toFixed(2),
+        sqlEscape(r.state), sqlEscape(r.month), sqlEscape(r.date), sqlEscape(r.time||'00:00:00')].join(', ') + ')';
+    }).join(',\n') + ';\n';
+  }
+  sql += '\nCOMMIT;\n';
+  return sql;
+}
+
+function buildTransactionSQL(rows) {
+  var now = new Date().toISOString().replace('T',' ').slice(0,19);
+  var sql = '-- Finance Tracker SQL Export (Transactions)\n-- Generated: ' + now + '\n\n';
+  sql += 'SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";\nSET AUTOCOMMIT = 0;\nSTART TRANSACTION;\n\n';
+  sql += 'CREATE TABLE IF NOT EXISTS `transactions` (\n';
+  sql += '  `id` int(11) NOT NULL AUTO_INCREMENT,\n';
+  sql += '  `type` enum(\'income\',\'expense\') NOT NULL,\n';
+  sql += '  `category` varchar(255) NOT NULL,\n';
+  sql += '  `amount` decimal(10,2) NOT NULL,\n';
+  sql += '  `description` text NOT NULL,\n';
+  sql += '  `date` timestamp NULL DEFAULT current_timestamp(),\n';
+  sql += '  `month` varchar(20) DEFAULT NULL,\n';
+  sql += '  PRIMARY KEY (`id`)\n) ENGINE=MyISAM DEFAULT CHARSET=latin1;\n\n';
+  if (rows.length > 0) {
+    sql += 'INSERT INTO `transactions` (`id`, `type`, `category`, `amount`, `description`, `date`, `month`) VALUES\n';
+    sql += rows.map(function(r) {
+      var d = r.date ? r.date.replace('T',' ').slice(0,19) : '';
+      return '(' + [Number(r.id), sqlEscape(r.type), sqlEscape(r.category),
+        parseFloat(r.amount).toFixed(2), sqlEscape(r.description), sqlEscape(d), sqlEscape(r.month)].join(', ') + ')';
+    }).join(',\n') + ';\n';
+  }
+  sql += '\nCOMMIT;\n';
+  return sql;
+}
+
+function downloadSQL(content, filename) {
+  var blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  var url  = URL.createObjectURL(blob);
+  var a    = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+function exportSQL(mode) {
+  closeExportModal();
+  var store = mode === 'saving' ? 'saving' : 'transactions';
+  var build = mode === 'saving' ? buildSavingSQL : buildTransactionSQL;
+  var fname = mode === 'saving' ? 'saving_export.sql' : 'transactions_all.sql';
+  dbGetAll(store).then(function(rows) {
+    downloadSQL(build(rows), fname);
+    showToast('Exported ' + rows.length + ' records!', 'success');
+  }).catch(function(err) { showToast('Export failed: ' + err.message, 'error'); });
+}
+
+// ── Init ──────────────────────────────────────────────────────────
+loadData();
+</script>
+</body>
+</html>
