@@ -11,12 +11,12 @@
  */
 
 var FIREBASE_CONFIG = {
-  apiKey:            "YOUR_API_KEY",
-  authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId:         "YOUR_PROJECT_ID",
-  storageBucket:     "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId:             "YOUR_APP_ID"
+  apiKey: "AIzaSyAp2pAPQ8ZGXC0Aog4aZUqdbr7u4Uy0_AA",
+  authDomain: "income-tracker-32de2.firebaseapp.com",
+  projectId: "income-tracker-32de2",
+  storageBucket: "income-tracker-32de2.firebasestorage.app",
+  messagingSenderId: "747655853517",
+  appId: "1:747655853517:web:9af82662e82d605db80084"
 };
 
 var FinanceDB = (function () {
