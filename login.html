@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;">
+  <title>Login — Finance Tracker</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    :root {
+      --bg: #111318; --surface: #1c1f27; --border: rgba(255,255,255,0.08);
+      --text: #e8eaf0; --muted: #8a8f9e; --green: #00d4a0; --red: #ff5f6d;
+      --blue: #4fc3f7; --radius: 14px; --radius-sm: 8px;
+    }
+    body {
+      font-family: 'DM Sans', system-ui, sans-serif;
+      background: var(--bg); color: var(--text);
+      min-height: 100vh; display: flex; align-items: center;
+      justify-content: center; padding: 1.5rem; overflow: hidden;
+    }
+    /* SPLASH */
+    #splash {
+      position: fixed; inset: 0; z-index: 9000; background: var(--bg);
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; padding: 24px;
+      transition: opacity 0.55s ease, transform 0.55s ease;
+    }
+    #splash.out { opacity: 0; transform: scale(1.04); pointer-events: none; }
+    .sp-blob { position: absolute; border-radius: 50%; pointer-events: none; filter: blur(72px); }
+    .sp-b1 { width:380px;height:380px;background:rgba(0,212,160,0.16);top:-80px;left:-80px;animation:bm1 9s ease-in-out infinite; }
+    .sp-b2 { width:300px;height:300px;background:rgba(79,195,247,0.12);bottom:-60px;right:-60px;animation:bm2 11s ease-in-out infinite; }
+    .sp-b3 { width:220px;height:220px;background:rgba(0,212,160,0.07);top:50%;left:60%;animation:bm3 13s ease-in-out infinite; }
+    @keyframes bm1{0%,100%{transform:translate(0,0)}50%{transform:translate(45px,30px)}}
+    @keyframes bm2{0%,100%{transform:translate(0,0)}50%{transform:translate(-30px,-40px)}}
+    @keyframes bm3{0%,100%{transform:translate(0,0)}50%{transform:translate(-20px,35px)}}
+    .sp-grid {
+      position:absolute;inset:0;pointer-events:none;
+      background-image:linear-gradient(rgba(255,255,255,.022) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.022) 1px,transparent 1px);
+      background-size:56px 56px;
+    }
+    .sp-icon-wrap { position:relative;margin-bottom:36px;animation:iconIn .9s cubic-bezier(.34,1.56,.64,1) both; }
+    @keyframes iconIn{from{opacity:0;transform:scale(.4) translateY(24px)}to{opacity:1;transform:scale(1) translateY(0)}}
+    .sp-ring { position:absolute;border-radius:50%;animation:rp 2.8s ease-in-out infinite; }
+    .sp-r1{inset:-15px;border:1px solid rgba(0,212,160,.32);animation-delay:0s}
+    .sp-r2{inset:-30px;border:1px solid rgba(79,195,247,.16);animation-delay:.38s}
+    .sp-r3{inset:-47px;border:1px solid rgba(0,212,160,.07);animation-delay:.76s}
+    @keyframes rp{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:1;transform:scale(1.04)}}
+    .sp-icon {
+      width:114px;height:114px;background:linear-gradient(135deg,#00d4a0 0%,#00b386 45%,#4fc3f7 100%);
+      border-radius:30px;display:flex;align-items:center;justify-content:center;
+      position:relative;overflow:hidden;
+      box-shadow:0 0 50px rgba(0,212,160,.5),0 0 100px rgba(79,195,247,.18),0 18px 48px rgba(0,0,0,.55);
+      animation:iglow 3s ease-in-out infinite;
+    }
+    @keyframes iglow{0%,100%{box-shadow:0 0 50px rgba(0,212,160,.5),0 18px 48px rgba(0,0,0,.55)}50%{box-shadow:0 0 70px rgba(0,212,160,.72),0 18px 48px rgba(0,0,0,.55)}}
+    .sp-icon::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.2) 0%,transparent 55%)}
+    .sp-icon-emoji{font-size:52px;position:relative;z-index:2;filter:drop-shadow(0 2px 8px rgba(0,0,0,.3));animation:emojiFloat 3s ease-in-out infinite}
+    @keyframes emojiFloat{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-4px) scale(1.05)}}
+    .sp-name {
+      font-family:'Syne',sans-serif;font-size:44px;font-weight:800;letter-spacing:-2px;
+      background:linear-gradient(135deg,#e8eaf0 15%,#00d4a0 55%,#4fc3f7 100%);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+      margin-bottom:8px;animation:su .8s cubic-bezier(.34,1.2,.64,1) .28s both;
+    }
+    .sp-sub{font-size:12px;color:var(--muted);letter-spacing:3.5px;text-transform:uppercase;margin-bottom:10px;animation:su .8s ease .44s both}
+    .sp-author{font-size:12px;color:rgba(138,143,158,.5);margin-bottom:50px;animation:su .8s ease .52s both}
+    .sp-author span{color:var(--green);font-weight:500}
+    @keyframes su{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+    .sp-pills{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:50px;animation:su .8s ease .62s both}
+    .sp-pill{display:flex;align-items:center;gap:5px;padding:6px 13px;border-radius:99px;background:rgba(255,255,255,.04);border:.5px solid rgba(255,255,255,.09);font-size:11px;color:var(--muted)}
+    .pd{width:6px;height:6px;border-radius:50%}
+    .pd-g{background:#00d4a0;box-shadow:0 0 7px rgba(0,212,160,.9)}
+    .pd-b{background:#4fc3f7;box-shadow:0 0 7px rgba(79,195,247,.9)}
+    .pd-r{background:#ff5f6d;box-shadow:0 0 7px rgba(255,95,109,.9)}
+    .pd-y{background:#fbbf24;box-shadow:0 0 7px rgba(251,191,36,.9)}
+    .sp-loader{display:flex;flex-direction:column;align-items:center;gap:12px;animation:su .8s ease .82s both}
+    .sp-bar{width:154px;height:3px;background:rgba(255,255,255,.07);border-radius:99px;overflow:hidden}
+    .sp-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--blue));border-radius:99px;animation:lw 2s cubic-bezier(.4,0,.2,1) forwards}
+    @keyframes lw{0%{width:0%}60%{width:70%}85%{width:88%}100%{width:100%}}
+    .sp-ltxt{font-size:10px;color:rgba(138,143,158,.4);font-family:monospace;letter-spacing:2px}
+    .sp-dots{display:flex;gap:7px}
+    .sp-dot{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.12);animation:da 1.4s ease-in-out infinite}
+    .sp-dot:nth-child(1){animation-delay:0s}.sp-dot:nth-child(2){animation-delay:.22s}.sp-dot:nth-child(3){animation-delay:.44s}
+    @keyframes da{0%,80%,100%{background:rgba(255,255,255,.12);transform:scale(1)}40%{background:var(--green);transform:scale(1.5)}}
+    /* APP */
+    #app{width:100%;display:flex;align-items:center;justify-content:center;opacity:0;transform:translateY(10px);transition:opacity .5s ease,transform .5s ease}
+    #app.on{opacity:1;transform:translateY(0)}
+    .login-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:2.5rem 2rem;width:100%;max-width:380px;box-shadow:0 8px 40px rgba(0,0,0,0.4)}
+    .logo{text-align:center;margin-bottom:2rem}
+    .logo-icon{font-size:3rem;display:block;margin-bottom:.5rem}
+    .logo h1{font-size:1.3rem;font-weight:800;background:linear-gradient(90deg,var(--green),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .logo p{font-size:.8rem;color:var(--muted);margin-top:.25rem}
+    .form-group{display:flex;flex-direction:column;gap:.35rem;margin-bottom:1rem}
+    .form-group label{font-size:.78rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+    .input-wrap{position:relative}
+    .input-wrap input{width:100%;padding:.75rem 2.5rem .75rem .9rem;border-radius:var(--radius-sm);border:1px solid var(--border);background:#242831;color:var(--text);font-size:1rem;transition:border-color .2s}
+    .input-wrap input:focus{outline:none;border-color:var(--green)}
+    .eye-btn{position:absolute;right:.6rem;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.1rem;padding:.2rem;line-height:1}
+    .btn-login{width:100%;padding:.85rem;margin-top:.5rem;border:none;border-radius:var(--radius-sm);background:linear-gradient(90deg,var(--green),#00b386);color:#0a2e22;font-size:1rem;font-weight:800;cursor:pointer;transition:opacity .2s,transform .15s;letter-spacing:.02em}
+    .btn-login:hover{opacity:.88;transform:translateY(-1px)}.btn-login:active{transform:scale(.98)}.btn-login:disabled{opacity:.5;cursor:not-allowed;transform:none}
+    .error-msg{display:none;background:rgba(255,95,109,.1);border:1px solid rgba(255,95,109,.3);color:var(--red);border-radius:var(--radius-sm);padding:.65rem .9rem;font-size:.85rem;margin-top:.75rem;text-align:center}
+    .error-msg.show{display:block}
+    .spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(10,46,34,.3);border-top-color:#0a2e22;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .footer-note{text-align:center;margin-top:2rem;font-size:.72rem;color:var(--muted)}
+    .offline-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(0,212,160,0.1);border:1px solid rgba(0,212,160,0.25);color:var(--green);border-radius:99px;padding:3px 10px;font-size:0.72rem;font-weight:600;margin-top:0.5rem}
+  </style>
+</head>
+<body>
+  <div id="splash">
+    <div class="sp-blob sp-b1"></div>
+    <div class="sp-blob sp-b2"></div>
+    <div class="sp-blob sp-b3"></div>
+    <div class="sp-grid"></div>
+    <div class="sp-icon-wrap">
+      <div class="sp-ring sp-r3"></div>
+      <div class="sp-ring sp-r2"></div>
+      <div class="sp-ring sp-r1"></div>
+      <div class="sp-icon"><span class="sp-icon-emoji">💰</span></div>
+    </div>
+    <div class="sp-name">Finance Tracker</div>
+    <div class="sp-sub">Personal Finance Manager</div>
+    <div class="sp-author">by <span>Avishka Batapola</span></div>
+    <div class="sp-pills">
+      <div class="sp-pill"><span class="pd pd-g"></span>Income &amp; Expenses</div>
+      <div class="sp-pill"><span class="pd pd-b"></span>Analytics</div>
+      <div class="sp-pill"><span class="pd pd-y"></span>Budget Tracking</div>
+      <div class="sp-pill"><span class="pd pd-r"></span>Offline Mode</div>
+    </div>
+    <div class="sp-loader">
+      <div class="sp-bar"><div class="sp-fill"></div></div>
+      <div class="sp-ltxt">LOADING</div>
+      <div class="sp-dots">
+        <div class="sp-dot"></div><div class="sp-dot"></div><div class="sp-dot"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="app">
+    <div class="login-card">
+      <div class="logo">
+        <span class="logo-icon">💰</span>
+        <h1>Finance Tracker</h1>
+        <p>by Avishka Batapola</p>
+        <div class="offline-badge">⚡ Offline — No internet needed</div>
+      </div>
+      <div class="form-group">
+        <label for="username">Username</label>
+        <div class="input-wrap">
+          <input type="text" id="username" placeholder="Enter username" autocomplete="username" autocapitalize="none" spellcheck="false" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <div class="input-wrap">
+          <input type="password" id="password" placeholder="Enter password" autocomplete="current-password" />
+          <button class="eye-btn" type="button" onclick="togglePass()" title="Show/hide">👁</button>
+        </div>
+      </div>
+      <button class="btn-login" id="loginBtn" onclick="doLogin()">Sign In</button>
+      <div class="error-msg" id="errMsg">❌ Incorrect username or password.</div>
+      <div class="footer-note">© All rights reserved. A product by <strong>Avishka Batapola</strong>.</div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="db.js"></script>
+  <script>
+    // ── Credentials (change as needed) ───────────────────────────
+    const USERS = [
+      { username: 'admin',   password: 'admin123' },
+      { username: 'avishka', password: '16724' }
+    ];
+
+    // ── DB Init on load (so first launch is fast) ─────────────────
+    window.addEventListener('DOMContentLoaded', function () {
+      // Pre-initialize IndexedDB
+      FinanceDB.init().catch(function(){});
+
+      if (sessionStorage.getItem('ft_auth') === 'true') {
+        location.replace('index.html');
+        return;
+      }
+      setTimeout(function () {
+        var splash = document.getElementById('splash');
+        splash.classList.add('out');
+        setTimeout(function () {
+          splash.style.display = 'none';
+          document.body.style.overflow = '';
+          document.getElementById('app').classList.add('on');
+        }, 580);
+      }, 2200);
+    });
+
+    function togglePass() {
+      var inp = document.getElementById('password');
+      inp.type = inp.type === 'password' ? 'text' : 'password';
+    }
+
+    document.addEventListener('DOMContentLoaded', function(){
+      document.getElementById('username').addEventListener('keydown', function(e){ if(e.key==='Enter') document.getElementById('password').focus(); });
+      document.getElementById('password').addEventListener('keydown', function(e){ if(e.key==='Enter') doLogin(); });
+    });
+
+    function doLogin() {
+      var uname = document.getElementById('username').value.trim();
+      var pword = document.getElementById('password').value;
+      var btn   = document.getElementById('loginBtn');
+      var err   = document.getElementById('errMsg');
+      err.classList.remove('show');
+      var match = USERS.find(function(u){ return u.username===uname && u.password===pword; });
+      if (match) {
+        btn.disabled  = true;
+        btn.innerHTML = '<span class="spinner"></span> Signing in…';
+        sessionStorage.setItem('ft_auth', 'true');
+        sessionStorage.setItem('ft_user', uname);
+        setTimeout(function(){ location.replace('index.html'); }, 600);
+      } else {
+        err.classList.add('show');
+        document.getElementById('password').value = '';
+        document.getElementById('password').focus();
+      }
+    }
+
+    // ── IndexedDB helper removed — now using db.js (Firebase) ─────
+  </script>
+</body>
+</html>
