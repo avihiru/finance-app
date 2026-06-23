@@ -543,7 +543,9 @@
             '<div class="tx-name">'+esc(tx.description)+'</div>' +
             '<div class="tx-meta">' +
               '<span class="tx-cat-badge">'+esc(tx.category)+'</span>' +
-              '<span>'+esc(tx.date||'')+'</span>' +
+            '</div>' +
+            '<div class="tx-meta">' +
+            '<span>'+esc(tx.date||'')+'</span>' +
             '</div>' +
           '</div>' +
           '<div class="tx-amount '+esc(tx.type)+'">'+(isIncome?'+':'−')+fmt(tx.amount)+'</div>' +
